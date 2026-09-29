@@ -1,0 +1,981 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Royal Blackjack Casino</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;900&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        
+        .font-serif-gold {
+            font-family: 'Cinzel', serif;
+        }
+
+        /* カジノテーブル背景 */
+        .felt-table {
+            background: radial-gradient(circle at center, #135029 0%, #082914 75%, #031409 100%);
+            box-shadow: inset 0 0 100px rgba(0, 0, 0, 0.8);
+        }
+
+        /* 黄金グラデーションテキスト */
+        .gold-text {
+            background: linear-gradient(135deg, #FFE082 0%, #FFB300 50%, #B78103 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        /* カードアニメーション */
+        .card-container {
+            perspective: 1000px;
+        }
+
+        .card {
+            transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.3s;
+            transform-style: preserve-3d;
+            box-shadow: 2px 4px 12px rgba(0,0,0,0.4);
+        }
+
+        .card-enter {
+            animation: cardDeal 0.4s ease-out forwards;
+        }
+
+        @keyframes cardDeal {
+            0% {
+                opacity: 0;
+                transform: translateY(-100px) rotate(-10deg) scale(0.6);
+            }
+            100% {
+                opacity: 1;
+                transform: translateY(0) rotate(0deg) scale(1);
+            }
+        }
+
+        /* チップデザイン */
+        .chip {
+            box-shadow: 0 6px 0 rgba(0, 0, 0, 0.4), 0 8px 15px rgba(0, 0, 0, 0.3);
+            transition: all 0.15s ease;
+        }
+
+        .chip:active {
+            transform: translateY(4px);
+            box-shadow: 0 2px 0 rgba(0, 0, 0, 0.4), 0 3px 6px rgba(0, 0, 0, 0.3);
+        }
+
+        /* カスタムスクロールバー */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #082914;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #1e6b37;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body class="felt-table min-h-screen text-white flex flex-col justify-between overflow-x-hidden">
+
+    <!-- ヘッダー / ナビゲーションバー -->
+    <header class="w-full bg-black/40 border-b border-amber-500/30 backdrop-blur-md px-4 py-3 flex justify-between items-center z-10">
+        <div class="flex items-center gap-3">
+            <div class="text-amber-400 text-xl sm:text-2xl font-black tracking-wider font-serif-gold flex items-center gap-2">
+                <i class="fa-solid fa-spade text-amber-400"></i>
+                ROYAL BLACKJACK
+            </div>
+        </div>
+
+        <div class="flex items-center gap-2 sm:gap-4">
+            <!-- 所持金 (バンクロール) -->
+            <div class="bg-black/60 border border-amber-500/40 rounded-full px-3 sm:px-4 py-1.5 flex items-center gap-2 shadow-inner">
+                <i class="fa-solid fa-coins text-amber-400"></i>
+                <span class="text-xs text-amber-200 uppercase font-semibold hidden xs:inline">所持金:</span>
+                <span id="bankroll-display" class="font-bold text-sm sm:text-lg text-emerald-400 font-mono">$1,000</span>
+            </div>
+
+            <!-- 成績モーダルボタン -->
+            <button id="stats-btn" class="bg-emerald-800/80 hover:bg-emerald-700 text-amber-200 border border-amber-500/30 px-3 py-1.5 rounded-lg text-sm transition flex items-center gap-1.5 shadow">
+                <i class="fa-solid fa-chart-pie"></i>
+                <span class="hidden sm:inline">成績</span>
+            </button>
+
+            <!-- サウンド切り替え -->
+            <button id="sound-btn" class="bg-emerald-800/80 hover:bg-emerald-700 text-amber-200 border border-amber-500/30 p-2 rounded-lg text-sm transition shadow">
+                <i id="sound-icon" class="fa-solid fa-volume-high"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- メインカジノテーブルエリア -->
+    <main class="flex-1 max-w-5xl w-full mx-auto p-4 flex flex-col justify-between items-center relative">
+
+        <!-- テーブルウォーターマーク -->
+        <div class="absolute inset-0 flex flex-col items-center justify-center opacity-10 pointer-events-none select-none px-4">
+            <div class="font-serif-gold text-2xl sm:text-5xl font-bold text-amber-300 tracking-widest text-center">BLACKJACK PAYS 3 TO 2</div>
+            <div class="font-serif-gold text-sm sm:text-xl text-amber-100 mt-2 text-center">Dealer must draw to 16 and stand on all 17s</div>
+        </div>
+
+        <!-- ディーラーエリア -->
+        <div class="w-full flex flex-col items-center mt-2 z-10">
+            <div class="flex items-center gap-2 mb-2">
+                <span class="text-amber-200/80 text-xs font-semibold tracking-widest uppercase">DEALER</span>
+                <span id="dealer-score-badge" class="bg-black/60 text-amber-300 font-mono text-xs px-2.5 py-0.5 rounded-full border border-amber-500/30 hidden">0</span>
+            </div>
+            <!-- ディーラーの手札 -->
+            <div id="dealer-cards" class="flex justify-center items-center -space-x-8 sm:-space-x-12 min-h-[140px] p-2"></div>
+        </div>
+
+        <!-- ステータスバナー -->
+        <div id="status-message-container" class="my-4 z-20 min-h-[50px] flex items-center justify-center w-full px-2">
+            <div id="status-banner" class="opacity-0 transition-all duration-300 transform scale-95 px-6 py-2 rounded-full font-serif-gold font-bold text-base sm:text-2xl border text-center shadow-2xl">
+                WELCOME
+            </div>
+        </div>
+
+        <!-- プレイヤーエリア -->
+        <div class="w-full flex flex-col items-center mb-2 z-10">
+            <!-- プレイヤーの手札 -->
+            <div id="player-cards" class="flex justify-center items-center -space-x-8 sm:-space-x-12 min-h-[140px] p-2"></div>
+            <div class="flex items-center gap-2 mt-2">
+                <span class="text-amber-200/80 text-xs font-semibold tracking-widest uppercase">PLAYER</span>
+                <span id="player-score-badge" class="bg-black/60 text-amber-300 font-mono text-xs px-2.5 py-0.5 rounded-full border border-amber-500/30 hidden">0</span>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- コントロールパネル / ベットコントロール (フッター) -->
+    <footer class="w-full bg-black/70 border-t border-amber-500/30 backdrop-blur-md p-4 z-20">
+        <div class="max-w-4xl mx-auto flex flex-col items-center gap-4">
+
+            <!-- プレイヤーアクションボタン -->
+            <div id="action-controls" class="hidden flex-wrap justify-center gap-2 sm:gap-4 w-full">
+                <button id="btn-hit" class="flex-1 min-w-[100px] max-w-[140px] bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-bold py-3 px-3 rounded-xl shadow-lg border border-emerald-400 transition transform active:scale-95 flex flex-col items-center">
+                    <span class="text-base sm:text-lg"><i class="fa-solid fa-plus"></i> ヒット</span>
+                    <span class="text-[10px] text-emerald-200">1枚引く</span>
+                </button>
+                <button id="btn-stand" class="flex-1 min-w-[100px] max-w-[140px] bg-red-600 hover:bg-red-500 active:bg-red-700 text-white font-bold py-3 px-3 rounded-xl shadow-lg border border-red-400 transition transform active:scale-95 flex flex-col items-center">
+                    <span class="text-base sm:text-lg"><i class="fa-solid fa-hand"></i> スタンド</span>
+                    <span class="text-[10px] text-red-200">勝負する</span>
+                </button>
+                <button id="btn-double" class="flex-1 min-w-[100px] max-w-[140px] bg-amber-600 hover:bg-amber-500 active:bg-amber-700 text-white font-bold py-3 px-3 rounded-xl shadow-lg border border-amber-400 transition transform active:scale-95 flex flex-col items-center">
+                    <span class="text-base sm:text-lg"><i class="fa-solid fa-angles-up"></i> ダブル</span>
+                    <span class="text-[10px] text-amber-200">賭け金2倍＆1枚</span>
+                </button>
+                <button id="btn-surrender" class="flex-1 min-w-[100px] max-w-[140px] bg-slate-600 hover:bg-slate-500 active:bg-slate-700 text-white font-bold py-3 px-3 rounded-xl shadow-lg border border-slate-400 transition transform active:scale-95 flex flex-col items-center">
+                    <span class="text-base sm:text-lg"><i class="fa-solid fa-flag"></i> サレンダー</span>
+                    <span class="text-[10px] text-slate-300">降参 (半額返却)</span>
+                </button>
+            </div>
+
+            <!-- ベットフェーズのコントロール -->
+            <div id="betting-controls" class="flex flex-col items-center gap-3 w-full">
+                <!-- ベット情報ディスプレイ -->
+                <div class="flex items-center justify-center gap-4">
+                    <div class="text-center">
+                        <div class="text-xs text-amber-200/80 uppercase tracking-wider">現在のベット額</div>
+                        <div id="current-bet-display" class="text-2xl font-bold font-mono gold-text">$0</div>
+                    </div>
+                </div>
+
+                <!-- チップ選択ボタン -->
+                <div class="flex flex-wrap justify-center gap-2 sm:gap-4 my-1">
+                    <button data-value="10" class="chip-btn chip w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-blue-600 border-4 border-dashed border-white font-bold text-xs sm:text-sm text-white flex items-center justify-center cursor-pointer transform hover:-translate-y-1">
+                        $10
+                    </button>
+                    <button data-value="25" class="chip-btn chip w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-emerald-600 border-4 border-dashed border-white font-bold text-xs sm:text-sm text-white flex items-center justify-center cursor-pointer transform hover:-translate-y-1">
+                        $25
+                    </button>
+                    <button data-value="100" class="chip-btn chip w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-black border-4 border-dashed border-amber-400 font-bold text-xs sm:text-sm text-amber-400 flex items-center justify-center cursor-pointer transform hover:-translate-y-1">
+                        $100
+                    </button>
+                    <button data-value="500" class="chip-btn chip w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-purple-700 border-4 border-dashed border-white font-bold text-xs sm:text-sm text-white flex items-center justify-center cursor-pointer transform hover:-translate-y-1">
+                        $500
+                    </button>
+                </div>
+
+                <!-- ベット操作ボタン -->
+                <div class="flex gap-2 sm:gap-3 w-full max-w-md justify-center">
+                    <button id="btn-clear-bet" class="bg-gray-700 hover:bg-gray-600 active:bg-gray-800 text-gray-200 px-4 py-2 rounded-lg text-sm font-semibold transition">
+                        クリア
+                    </button>
+                    <button id="btn-all-in" class="bg-purple-800 hover:bg-purple-700 active:bg-purple-900 text-purple-200 px-4 py-2 rounded-lg text-sm font-semibold transition">
+                        オールイン
+                    </button>
+                    <button id="btn-deal" class="flex-1 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-black font-bold py-2.5 px-6 rounded-lg shadow-lg border border-amber-300 transition transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed">
+                        ディール (開始)
+                    </button>
+                </div>
+            </div>
+
+            <!-- 次のゲーム開始ボタン -->
+            <div id="next-round-controls" class="hidden w-full max-w-xs">
+                <button id="btn-next-round" class="w-full bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-black font-extrabold py-3 px-6 rounded-xl shadow-xl border border-amber-300 transition transform hover:scale-105 active:scale-95 text-lg">
+                    次のラウンドへ <i class="fa-solid fa-arrow-right ml-1"></i>
+                </button>
+            </div>
+
+        </div>
+    </footer>
+
+    <!-- 成績・統計モーダル -->
+    <div id="stats-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 opacity-0 pointer-events-none transition-opacity duration-300">
+        <div class="bg-slate-900 border border-amber-500/40 rounded-2xl p-6 max-w-md w-full text-white shadow-2xl relative transform scale-95 transition-transform duration-300">
+            <button id="close-stats-btn" class="absolute top-4 right-4 text-gray-400 hover:text-white text-xl">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+            <h2 class="text-2xl font-bold font-serif-gold gold-text mb-4 text-center">戦績・プレイデータ</h2>
+            
+            <div class="space-y-3 font-sans">
+                <div class="flex justify-between py-2 border-b border-slate-800">
+                    <span class="text-gray-400">プレイ回数</span>
+                    <span id="stat-games-played" class="font-bold font-mono">0</span>
+                </div>
+                <div class="flex justify-between py-2 border-b border-slate-800">
+                    <span class="text-gray-400">勝利数 / 勝率</span>
+                    <span id="stat-wins-rate" class="font-bold font-mono text-emerald-400">0 (0%)</span>
+                </div>
+                <div class="flex justify-between py-2 border-b border-slate-800">
+                    <span class="text-gray-400">引き分け (Push)</span>
+                    <span id="stat-pushes" class="font-bold font-mono text-amber-400">0</span>
+                </div>
+                <div class="flex justify-between py-2 border-b border-slate-800">
+                    <span class="text-gray-400">敗北数</span>
+                    <span id="stat-losses" class="font-bold font-mono text-red-400">0</span>
+                </div>
+                <div class="flex justify-between py-2 border-b border-slate-800">
+                    <span class="text-gray-400">ブラックジャック達成数</span>
+                    <span id="stat-blackjacks" class="font-bold font-mono text-purple-400">0</span>
+                </div>
+                <div class="flex justify-between py-2 border-b border-slate-800">
+                    <span class="text-gray-400">最高所持金記録</span>
+                    <span id="stat-max-bankroll" class="font-bold font-mono text-emerald-300">$1,000</span>
+                </div>
+            </div>
+
+            <div class="mt-6 flex justify-between gap-3">
+                <button id="btn-reset-stats" class="text-xs text-red-400 hover:text-red-300 underline">
+                    データをリセット
+                </button>
+                <button id="btn-close-stats-modal" class="bg-amber-500 hover:bg-amber-400 text-black font-bold px-4 py-2 rounded-lg text-sm">
+                    閉じる
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 破産 (ゲームオーバー) モーダル -->
+    <div id="bankrupt-modal" class="fixed inset-0 bg-black/90 backdrop-blur-md z-50 flex items-center justify-center p-4 opacity-0 pointer-events-none transition-opacity duration-300">
+        <div class="bg-slate-900 border-2 border-red-600 rounded-2xl p-6 max-w-sm w-full text-center text-white shadow-2xl">
+            <div class="text-red-500 text-5xl mb-3"><i class="fa-solid fa-face-frown"></i></div>
+            <h2 class="text-2xl font-bold font-serif-gold text-red-500 mb-2">破産しました！</h2>
+            <p class="text-sm text-gray-300 mb-6">所持金がなくなりました。カジノから特別リロード資金（$1,000）をプレゼントします！</p>
+            <button id="btn-reload-bankroll" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-xl shadow-lg transition transform active:scale-95">
+                $1,000 を受け取って再挑戦
+            </button>
+        </div>
+    </div>
+
+    <script>
+        class SoundManager {
+            constructor() {
+                this.ctx = null;
+                this.enabled = true;
+            }
+
+            init() {
+                if (!this.ctx) {
+                    const AudioContext = window.AudioContext || window.webkitAudioContext;
+                    if (AudioContext) {
+                        this.ctx = new AudioContext();
+                    }
+                }
+            }
+
+            playTone(freq, type = 'sine', duration = 0.1, gainVal = 0.1) {
+                if (!this.enabled) return;
+                this.init();
+                if (!this.ctx) return;
+
+                try {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = type;
+                    osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+                    gain.gain.setValueAtTime(gainVal, this.ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.0001, this.ctx.currentTime + duration);
+
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+
+                    osc.start();
+                    osc.stop(this.ctx.currentTime + duration);
+                } catch (e) {
+                    console.error("Audio error", e);
+                }
+            }
+
+            playChipSound() {
+                this.playTone(800, 'sine', 0.05, 0.15);
+                setTimeout(() => this.playTone(1200, 'sine', 0.05, 0.1), 30);
+            }
+
+            playCardDealSound() {
+                this.playTone(300, 'triangle', 0.08, 0.2);
+            }
+
+            playWinSound() {
+                if (!this.enabled) return;
+                const notes = [523.25, 659.25, 783.99, 1046.50];
+                notes.forEach((freq, idx) => {
+                    setTimeout(() => {
+                        this.playTone(freq, 'triangle', 0.2, 0.2);
+                    }, idx * 100);
+                });
+            }
+
+            playBlackjackSound() {
+                if (!this.enabled) return;
+                const notes = [523.25, 659.25, 783.99, 987.77, 1046.50, 1318.51];
+                notes.forEach((freq, idx) => {
+                    setTimeout(() => {
+                        this.playTone(freq, 'square', 0.25, 0.15);
+                    }, idx * 80);
+                });
+            }
+
+            playLoseSound() {
+                if (!this.enabled) return;
+                const notes = [400, 350, 300, 250];
+                notes.forEach((freq, idx) => {
+                    setTimeout(() => {
+                        this.playTone(freq, 'sawtooth', 0.15, 0.1);
+                    }, idx * 120);
+                });
+            }
+        }
+
+        const sound = new SoundManager();
+
+        const SUITS = [
+            { name: 'spades', symbol: '♠', color: 'text-gray-900' },
+            { name: 'hearts', symbol: '♥', color: 'text-red-600' },
+            { name: 'diamonds', symbol: '♦', color: 'text-red-600' },
+            { name: 'clubs', symbol: '♣', color: 'text-gray-900' }
+        ];
+
+        const RANKS = [
+            { value: 'A', weight: 11 },
+            { value: '2', weight: 2 },
+            { value: '3', weight: 3 },
+            { value: '4', weight: 4 },
+            { value: '5', weight: 5 },
+            { value: '6', weight: 6 },
+            { value: '7', weight: 7 },
+            { value: '8', weight: 8 },
+            { value: '9', weight: 9 },
+            { value: '10', weight: 10 },
+            { value: 'J', weight: 10 },
+            { value: 'Q', weight: 10 },
+            { value: 'K', weight: 10 }
+        ];
+
+        class Deck {
+            constructor(numDecks = 6) {
+                this.numDecks = numDecks;
+                this.cards = [];
+                this.reset();
+            }
+
+            reset() {
+                this.cards = [];
+                for (let d = 0; d < this.numDecks; d++) {
+                    for (let s of SUITS) {
+                        for (let r of RANKS) {
+                            this.cards.push({
+                                suit: s,
+                                rank: r.value,
+                                weight: r.weight,
+                                id: Math.random().toString(36).substring(2, 9)
+                            });
+                        }
+                    }
+                }
+                this.shuffle();
+            }
+
+            shuffle() {
+                for (let i = this.cards.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [this.cards[i], this.cards[j]] = [this.cards[j], this.cards[i]];
+                }
+            }
+
+            draw() {
+                if (this.cards.length < 20) {
+                    this.reset();
+                }
+                return this.cards.pop();
+            }
+        }
+
+        const GameState = {
+            BETTING: 'BETTING',
+            PLAYER_TURN: 'PLAYER_TURN',
+            DEALER_TURN: 'DEALER_TURN',
+            GAME_OVER: 'GAME_OVER'
+        };
+
+        class BlackjackGame {
+            constructor() {
+                this.deck = new Deck(6);
+                this.bankroll = 1000;
+                this.currentBet = 0;
+                this.playerCards = [];
+                this.dealerCards = [];
+                this.state = GameState.BETTING;
+                this.dealerHidden = true;
+
+                this.stats = {
+                    gamesPlayed: 0,
+                    wins: 0,
+                    losses: 0,
+                    pushes: 0,
+                    blackjacks: 0,
+                    maxBankroll: 1000
+                };
+
+                this.loadFromLocalStorage();
+            }
+
+            saveToLocalStorage() {
+                try {
+                    localStorage.setItem('bj_bankroll', this.bankroll.toString());
+                    localStorage.setItem('bj_stats', JSON.stringify(this.stats));
+                } catch (e) {}
+            }
+
+            loadFromLocalStorage() {
+                try {
+                    const savedBankroll = localStorage.getItem('bj_bankroll');
+                    if (savedBankroll !== null) {
+                        this.bankroll = parseInt(savedBankroll, 10);
+                    }
+                    const savedStats = localStorage.getItem('bj_stats');
+                    if (savedStats) {
+                        this.stats = { ...this.stats, ...JSON.parse(savedStats) };
+                    }
+                } catch (e) {}
+            }
+
+            addBet(amount) {
+                if (this.state !== GameState.BETTING) return false;
+                if (this.bankroll >= amount) {
+                    this.bankroll -= amount;
+                    this.currentBet += amount;
+                    this.saveToLocalStorage();
+                    return true;
+                }
+                return false;
+            }
+
+            clearBet() {
+                if (this.state !== GameState.BETTING) return;
+                this.bankroll += this.currentBet;
+                this.currentBet = 0;
+                this.saveToLocalStorage();
+            }
+
+            allIn() {
+                if (this.state !== GameState.BETTING) return;
+                this.currentBet += this.bankroll;
+                this.bankroll = 0;
+                this.saveToLocalStorage();
+            }
+
+            startDeal() {
+                if (this.currentBet <= 0) return false;
+
+                this.state = GameState.PLAYER_TURN;
+                this.playerCards = [];
+                this.dealerCards = [];
+                this.dealerHidden = true;
+
+                this.playerCards.push(this.deck.draw());
+                this.dealerCards.push(this.deck.draw());
+                this.playerCards.push(this.deck.draw());
+                this.dealerCards.push(this.deck.draw());
+
+                this.stats.gamesPlayed++;
+                if (this.bankroll + this.currentBet > this.stats.maxBankroll) {
+                    this.stats.maxBankroll = this.bankroll + this.currentBet;
+                }
+
+                return true;
+            }
+
+            calculateScore(cards) {
+                let score = 0;
+                let aces = 0;
+
+                for (let card of cards) {
+                    if (card.rank === 'A') {
+                        aces += 1;
+                        score += 11;
+                    } else {
+                        score += card.weight;
+                    }
+                }
+
+                while (score > 21 && aces > 0) {
+                    score -= 10;
+                    aces -= 1;
+                }
+
+                return score;
+            }
+
+            getPlayerScore() {
+                return this.calculateScore(this.playerCards);
+            }
+
+            getDealerScore(includeHidden = false) {
+                if (this.dealerHidden && !includeHidden) {
+                    if (this.dealerCards.length === 0) return 0;
+                    return this.calculateScore([this.dealerCards[0]]);
+                }
+                return this.calculateScore(this.dealerCards);
+            }
+
+            isBlackjack(cards) {
+                return cards.length === 2 && this.calculateScore(cards) === 21;
+            }
+
+            playerHit() {
+                if (this.state !== GameState.PLAYER_TURN) return null;
+                const card = this.deck.draw();
+                this.playerCards.push(card);
+                return card;
+            }
+
+            playerDoubleDown() {
+                if (this.state !== GameState.PLAYER_TURN || this.playerCards.length !== 2) return false;
+                if (this.bankroll < this.currentBet) return false;
+
+                this.bankroll -= this.currentBet;
+                this.currentBet *= 2;
+                this.playerCards.push(this.deck.draw());
+                this.saveToLocalStorage();
+                return true;
+            }
+
+            playerSurrender() {
+                if (this.state !== GameState.PLAYER_TURN || this.playerCards.length !== 2) return false;
+                this.state = GameState.GAME_OVER;
+                const refund = Math.floor(this.currentBet / 2);
+                this.bankroll += refund;
+                this.stats.losses++;
+                this.currentBet = 0;
+                this.saveToLocalStorage();
+                return true;
+            }
+        }
+
+        const game = new BlackjackGame();
+
+        const bankrollDisplay = document.getElementById('bankroll-display');
+        const currentBetDisplay = document.getElementById('current-bet-display');
+        const playerCardsEl = document.getElementById('player-cards');
+        const dealerCardsEl = document.getElementById('dealer-cards');
+        const playerScoreBadge = document.getElementById('player-score-badge');
+        const dealerScoreBadge = document.getElementById('dealer-score-badge');
+        const statusBanner = document.getElementById('status-banner');
+
+        const actionControls = document.getElementById('action-controls');
+        const bettingControls = document.getElementById('betting-controls');
+        const nextRoundControls = document.getElementById('next-round-controls');
+
+        const btnDeal = document.getElementById('btn-deal');
+        const btnClearBet = document.getElementById('btn-clear-bet');
+        const btnAllIn = document.getElementById('btn-all-in');
+        const btnHit = document.getElementById('btn-hit');
+        const btnStand = document.getElementById('btn-stand');
+        const btnDouble = document.getElementById('btn-double');
+        const btnSurrender = document.getElementById('btn-surrender');
+        const btnNextRound = document.getElementById('btn-next-round');
+
+        const statsModal = document.getElementById('stats-modal');
+        const bankruptModal = document.getElementById('bankrupt-modal');
+        const soundBtn = document.getElementById('sound-btn');
+
+        function updateUI() {
+            bankrollDisplay.textContent = `$${game.bankroll.toLocaleString()}`;
+            currentBetDisplay.textContent = `$${game.currentBet.toLocaleString()}`;
+
+            btnDeal.disabled = game.currentBet <= 0;
+
+            if (game.state === GameState.BETTING) {
+                bettingControls.classList.remove('hidden');
+                actionControls.classList.add('hidden');
+                nextRoundControls.classList.add('hidden');
+            } else if (game.state === GameState.PLAYER_TURN) {
+                bettingControls.classList.add('hidden');
+                actionControls.classList.remove('hidden');
+                nextRoundControls.classList.add('hidden');
+
+                btnDouble.disabled = (game.playerCards.length !== 2) || (game.bankroll < game.currentBet);
+                btnDouble.style.opacity = btnDouble.disabled ? '0.5' : '1';
+
+                btnSurrender.disabled = (game.playerCards.length !== 2);
+                btnSurrender.style.opacity = btnSurrender.disabled ? '0.5' : '1';
+            } else if (game.state === GameState.GAME_OVER) {
+                bettingControls.classList.add('hidden');
+                actionControls.classList.add('hidden');
+                nextRoundControls.classList.remove('hidden');
+            }
+        }
+
+        function createCardElement(card, isHidden = false) {
+            const cardDiv = document.createElement('div');
+            cardDiv.className = 'card card-enter w-20 h-28 sm:w-24 sm:h-36 bg-white rounded-lg border border-gray-300 flex flex-col justify-between p-2 relative shadow-md select-none';
+
+            if (isHidden) {
+                cardDiv.className += ' bg-gradient-to-br from-blue-800 to-indigo-950 border-2 border-amber-400';
+                cardDiv.innerHTML = `
+                    <div class="w-full h-full border border-amber-400/40 rounded flex items-center justify-center">
+                        <i class="fa-solid fa-crown text-amber-400/50 text-2xl"></i>
+                    </div>
+                `;
+                return cardDiv;
+            }
+
+            const colorClass = card.suit.color;
+
+            cardDiv.innerHTML = `
+                <div class="flex flex-col items-center leading-none ${colorClass}">
+                    <span class="text-base sm:text-lg font-bold font-mono">${card.rank}</span>
+                    <span class="text-xs sm:text-sm">${card.suit.symbol}</span>
+                </div>
+                <div class="absolute inset-0 flex items-center justify-center ${colorClass} opacity-20 text-3xl sm:text-4xl pointer-events-none">
+                    ${card.suit.symbol}
+                </div>
+                <div class="flex flex-col items-center leading-none ${colorClass} transform rotate-180">
+                    <span class="text-base sm:text-lg font-bold font-mono">${card.rank}</span>
+                    <span class="text-xs sm:text-sm">${card.suit.symbol}</span>
+                </div>
+            `;
+
+            return cardDiv;
+        }
+
+        function renderCards() {
+            playerCardsEl.innerHTML = '';
+            dealerCardsEl.innerHTML = '';
+
+            game.playerCards.forEach(card => {
+                playerCardsEl.appendChild(createCardElement(card));
+            });
+
+            game.dealerCards.forEach((card, index) => {
+                const isHidden = (index === 1 && game.dealerHidden);
+                dealerCardsEl.appendChild(createCardElement(card, isHidden));
+            });
+
+            if (game.playerCards.length > 0) {
+                playerScoreBadge.classList.remove('hidden');
+                playerScoreBadge.textContent = game.getPlayerScore();
+            } else {
+                playerScoreBadge.classList.add('hidden');
+            }
+
+            if (game.dealerCards.length > 0) {
+                dealerScoreBadge.classList.remove('hidden');
+                dealerScoreBadge.textContent = game.getDealerScore();
+            } else {
+                dealerScoreBadge.classList.add('hidden');
+            }
+        }
+
+        function showStatus(message, type = 'neutral') {
+            statusBanner.textContent = message;
+            statusBanner.className = 'transition-all duration-300 transform scale-100 px-6 py-2 rounded-full font-serif-gold font-bold text-base sm:text-2xl border text-center shadow-2xl ';
+
+            if (type === 'win') {
+                statusBanner.className += 'bg-emerald-900/90 text-amber-300 border-amber-400 shadow-emerald-900/50';
+            } else if (type === 'lose') {
+                statusBanner.className += 'bg-red-950/90 text-red-200 border-red-500 shadow-red-950/50';
+            } else if (type === 'push') {
+                statusBanner.className += 'bg-amber-900/90 text-amber-200 border-amber-400 shadow-amber-900/50';
+            } else if (type === 'blackjack') {
+                statusBanner.className += 'bg-gradient-to-r from-amber-500 via-purple-600 to-amber-500 text-white border-amber-300 animate-pulse';
+            } else {
+                statusBanner.className += 'bg-black/60 text-amber-200 border-amber-500/30';
+            }
+
+            statusBanner.style.opacity = '1';
+        }
+
+        function hideStatus() {
+            statusBanner.style.opacity = '0';
+        }
+
+        function handleDeal() {
+            if (!game.startDeal()) return;
+
+            sound.playCardDealSound();
+            renderCards();
+            updateUI();
+            hideStatus();
+
+            const playerBJ = game.isBlackjack(game.playerCards);
+            const dealerBJ = game.isBlackjack(game.dealerCards);
+
+            if (playerBJ || dealerBJ) {
+                game.dealerHidden = false;
+                renderCards();
+
+                if (playerBJ && dealerBJ) {
+                    game.bankroll += game.currentBet;
+                    game.stats.pushes++;
+                    showStatus('PUSH! 双方ブラックジャック', 'push');
+                    sound.playWinSound();
+                } else if (playerBJ) {
+                    const winAmount = Math.floor(game.currentBet * 2.5);
+                    game.bankroll += winAmount;
+                    game.stats.wins++;
+                    game.stats.blackjacks++;
+                    showStatus('BLACKJACK! (3 to 2)', 'blackjack');
+                    sound.playBlackjackSound();
+                } else {
+                    game.stats.losses++;
+                    showStatus('ディーラーのブラックジャック!', 'lose');
+                    sound.playLoseSound();
+                }
+
+                game.state = GameState.GAME_OVER;
+                game.currentBet = 0;
+                game.saveToLocalStorage();
+                updateUI();
+            }
+        }
+
+        function handleHit() {
+            sound.playCardDealSound();
+            game.playerHit();
+            renderCards();
+            updateUI();
+
+            const pScore = game.getPlayerScore();
+            if (pScore > 21) {
+                game.state = GameState.GAME_OVER;
+                game.stats.losses++;
+                showStatus(`BUST! (${pScore}) あなたの負けです`, 'lose');
+                sound.playLoseSound();
+                game.currentBet = 0;
+                game.saveToLocalStorage();
+                updateUI();
+                checkBankruptcy();
+            } else if (pScore === 21) {
+                handleStand();
+            }
+        }
+
+        function handleDoubleDown() {
+            if (game.playerDoubleDown()) {
+                sound.playChipSound();
+                sound.playCardDealSound();
+                renderCards();
+                updateUI();
+
+                if (game.getPlayerScore() > 21) {
+                    game.state = GameState.GAME_OVER;
+                    game.stats.losses++;
+                    showStatus(`BUST! (${game.getPlayerScore()}) ダブルダウン失敗`, 'lose');
+                    sound.playLoseSound();
+                    game.currentBet = 0;
+                    game.saveToLocalStorage();
+                    updateUI();
+                    checkBankruptcy();
+                } else {
+                    handleStand();
+                }
+            }
+        }
+
+        function handleSurrender() {
+            if (game.playerSurrender()) {
+                sound.playChipSound();
+                showStatus('サレンダー: ベットの半額が戻りました', 'neutral');
+                renderCards();
+                updateUI();
+                checkBankruptcy();
+            }
+        }
+
+        async function handleStand() {
+            game.state = GameState.DEALER_TURN;
+            game.dealerHidden = false;
+            renderCards();
+            updateUI();
+
+            while (game.getDealerScore() < 17) {
+                await new Promise(resolve => setTimeout(resolve, 600));
+                game.dealerCards.push(game.deck.draw());
+                sound.playCardDealSound();
+                renderCards();
+            }
+
+            const pScore = game.getPlayerScore();
+            const dScore = game.getDealerScore();
+
+            game.state = GameState.GAME_OVER;
+
+            if (dScore > 21) {
+                const winAmt = game.currentBet * 2;
+                game.bankroll += winAmt;
+                game.stats.wins++;
+                showStatus(`ディーラーBUST (${dScore})! あなたの勝ち!`, 'win');
+                sound.playWinSound();
+            } else if (pScore > dScore) {
+                const winAmt = game.currentBet * 2;
+                game.bankroll += winAmt;
+                game.stats.wins++;
+                showStatus(`勝利! (${pScore} vs ${dScore})`, 'win');
+                sound.playWinSound();
+            } else if (pScore < dScore) {
+                game.stats.losses++;
+                showStatus(`敗北... (${pScore} vs ${dScore})`, 'lose');
+                sound.playLoseSound();
+            } else {
+                game.bankroll += game.currentBet;
+                game.stats.pushes++;
+                showStatus(`引き分け (Push) (${pScore})`, 'push');
+            }
+
+            game.currentBet = 0;
+            game.saveToLocalStorage();
+            updateUI();
+            checkBankruptcy();
+        }
+
+        function checkBankruptcy() {
+            if (game.bankroll <= 0 && game.currentBet <= 0) {
+                setTimeout(() => {
+                    bankruptModal.classList.remove('opacity-0', 'pointer-events-none');
+                }, 1000);
+            }
+        }
+
+        document.querySelectorAll('.chip-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const val = parseInt(btn.dataset.value, 10);
+                if (game.addBet(val)) {
+                    sound.playChipSound();
+                    updateUI();
+                }
+            });
+        });
+
+        btnClearBet.addEventListener('click', () => {
+            game.clearBet();
+            sound.playChipSound();
+            updateUI();
+        });
+
+        btnAllIn.addEventListener('click', () => {
+            game.allIn();
+            sound.playChipSound();
+            updateUI();
+        });
+
+        btnDeal.addEventListener('click', handleDeal);
+        btnHit.addEventListener('click', handleHit);
+        btnStand.addEventListener('click', handleStand);
+        btnDouble.addEventListener('click', handleDoubleDown);
+        btnSurrender.addEventListener('click', handleSurrender);
+
+        btnNextRound.addEventListener('click', () => {
+            game.state = GameState.BETTING;
+            game.playerCards = [];
+            game.dealerCards = [];
+            renderCards();
+            hideStatus();
+            updateUI();
+        });
+
+        soundBtn.addEventListener('click', () => {
+            sound.enabled = !sound.enabled;
+            const icon = document.getElementById('sound-icon');
+            if (sound.enabled) {
+                icon.className = 'fa-solid fa-volume-high';
+            } else {
+                icon.className = 'fa-solid fa-volume-xmark text-red-400';
+            }
+        });
+
+        const statsBtn = document.getElementById('stats-btn');
+        const closeStatsBtn = document.getElementById('close-stats-btn');
+        const btnCloseStatsModal = document.getElementById('btn-close-stats-modal');
+        const btnResetStats = document.getElementById('btn-reset-stats');
+
+        function openStatsModal() {
+            document.getElementById('stat-games-played').textContent = game.stats.gamesPlayed;
+            const totalPlayed = game.stats.gamesPlayed || 1;
+            const winRate = Math.round((game.stats.wins / totalPlayed) * 100);
+            document.getElementById('stat-wins-rate').textContent = `${game.stats.wins} (${winRate}%)`;
+            document.getElementById('stat-pushes').textContent = game.stats.pushes;
+            document.getElementById('stat-losses').textContent = game.stats.losses;
+            document.getElementById('stat-blackjacks').textContent = game.stats.blackjacks;
+            document.getElementById('stat-max-bankroll').textContent = `$${game.stats.maxBankroll.toLocaleString()}`;
+
+            statsModal.classList.remove('opacity-0', 'pointer-events-none');
+        }
+
+        function closeStatsModal() {
+            statsModal.classList.add('opacity-0', 'pointer-events-none');
+        }
+
+        statsBtn.addEventListener('click', openStatsModal);
+        closeStatsBtn.addEventListener('click', closeStatsModal);
+        btnCloseStatsModal.addEventListener('click', closeStatsModal);
+
+        btnResetStats.addEventListener('click', () => {
+            game.stats = {
+                gamesPlayed: 0,
+                wins: 0,
+                losses: 0,
+                pushes: 0,
+                blackjacks: 0,
+                maxBankroll: game.bankroll
+            };
+            game.saveToLocalStorage();
+            openStatsModal();
+        });
+
+        document.getElementById('btn-reload-bankroll').addEventListener('click', () => {
+            game.bankroll = 1000;
+            game.saveToLocalStorage();
+            bankruptModal.classList.add('opacity-0', 'pointer-events-none');
+            updateUI();
+        });
+
+        window.onload = () => {
+            updateUI();
+            showStatus('チップを賭けて「ディール」を押してください', 'neutral');
+        };
+    </script>
+</body>
+</html>
